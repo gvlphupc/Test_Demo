@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI SMART BIN - MONITOR</title>
+    
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        :root { --primary: #00ff88; --bg: #0f172a; --card-bg: #1e293b; --text: #f1f5f9; --danger: #ef4444; --warning: #f59e0b; --success: #22c55e; }
+        body { font-family: 'Roboto', sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; min-height: 100vh; }
+        .header { text-align: center; margin-bottom: 40px; border-bottom: 2px solid var(--primary); width: 100%; max-width: 800px; }
+        .header h1 { margin: 0; color: var(--primary); font-size: 2rem; }
+        .container { display: flex; justify-content: center; gap: 30px; flex-wrap: wrap; width: 100%; max-width: 1200px; }
+        .card { background-color: var(--card-bg); border-radius: 20px; padding: 30px 20px; width: 300px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.3); transition: transform 0.3s; }
+        .card:hover { transform: translateY(-10px); }
+        .progress-circle { position: relative; width: 160px; height: 160px; border-radius: 50%; background: conic-gradient(var(--color) var(--percent), #334155 0deg); margin: 25px auto; display: flex; align-items: center; justify-content: center; }
+        .progress-circle::before { content: ""; position: absolute; width: 140px; height: 140px; background-color: var(--card-bg); border-radius: 50%; }
+        .value { position: relative; font-size: 2.5rem; font-weight: 700; z-index: 10; }
+        .status { margin-top: 10px; padding: 8px 16px; border-radius: 50px; display: inline-block; font-weight: bold; }
+        .recycle { --color: #3b82f6; --percent: 0deg; }
+        .organic { --color: #22c55e; --percent: 0deg; }
+        .others { --color: #ef4444; --percent: 0deg; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1><i class="fas fa-trash-alt"></i> Dashboard Quản Lý Rác</h1>
+        <p>Phiên bản tương thích (Chạy trực tiếp)</p>
+    </div>
+
+    <div class="container">
+        <div class="card">
+            <h2><i class="fas fa-recycle" style="color: #3b82f6;"></i> TÁI CHẾ</h2>
+            <div class="progress-circle recycle" id="circle-recycle">
+                <span class="value" id="val-recycle">0%</span>
+            </div>
+            <div class="status" id="status-recycle">Đang tải...</div>
+        </div>
+
+        <div class="card">
+            <h2><i class="fas fa-apple-alt" style="color: #22c55e;"></i> HỮU CƠ</h2>
+            <div class="progress-circle organic" id="circle-organic">
+                <span class="value" id="val-organic">0%</span>
+            </div>
+            <div class="status" id="status-organic">Đang tải...</div>
+        </div>
+
+        <div class="card">
+            <h2><i class="fas fa-box-open" style="color: #ef4444;"></i> RÁC KHÁC</h2>
+            <div class="progress-circle others" id="circle-others">
+                <span class="value" id="val-others">0%</span>
+            </div>
+            <div class="status" id="status-others">Đang tải...</div>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
+    <script>
+        // --- CẤU HÌNH FIREBASE (Dán thông tin của bạn vào đây) ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyAlYYIhQi6v9Hk8k-Z3OKqYHTfMcKkoSQo",
+            authDomain: "racai-71ebc.firebaseapp.com",
+            
+            // --- DÒNG QUAN TRỌNG NHẤT ---
+            databaseURL: "https://racai-71ebc-default-rtdb.asia-southeast1.firebasedatabase.app", 
+            // -----------------------------
+
+            projectId: "racai-71ebc",
+            storageBucket: "racai-71ebc.firebasestorage.app",
+            messagingSenderId: "1083978850284",
+            appId: "1:1083978850284:web:ea34b354b8f8467e7b2ac9"
+        };
+
+        // Khởi tạo Firebase (Cú pháp cũ ổn định hơn)
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+        const db = firebase.database();
+
+        // Hàm vẽ lại đồng hồ
+        function updateGauge(type, level) {
+            const circle = document.getElementById(`circle-${type}`);
+            const textVal = document.getElementById(`val-${type}`);
+            const statusBox = document.getElementById(`status-${type}`);
+
+            textVal.innerText = level + "%";
+            const deg = level * 3.6; 
+            circle.style.setProperty('--percent', `${deg}deg`);
+
+            if(level >= 90) {
+                statusBox.innerText = "ĐÃ ĐẦY! ⚠️";
+                statusBox.style.background = "var(--danger)";
+            } else if (level > 50) {
+                statusBox.innerText = "Sắp đầy";
+                statusBox.style.background = "var(--warning)";
+            } else {
+                statusBox.innerText = "Bình thường";
+                statusBox.style.background = "var(--success)";
+            }
+        }
+
+        // --- LẮNG NGHE DỮ LIỆU ---
+        console.log("Đang kết nối đến Firebase...");
+        const binRef = db.ref('bin_data');
+        
+        binRef.on('value', (snapshot) => {
+            const data = snapshot.val();
+            console.log("Dữ liệu nhận được:", data);
+            
+            if(data) {
+                updateGauge('recycle', data.recycle_level || 0);
+                updateGauge('organic', data.organic_level || 0);
+                updateGauge('others', data.others_level || 0);
+            }
+        });
+    </script>
+</body>
+</html>
